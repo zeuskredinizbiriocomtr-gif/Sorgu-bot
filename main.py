@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # --- AYARLAR ---
-TOKEN = "8550316537:AAFmA8xR9-j9zFW-rOLcdhYSSx2i5rSHY-Y"
+TOKEN = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8"
 TIMEOUT = 60
 
 # Loglama
