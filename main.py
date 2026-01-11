@@ -1,100 +1,99 @@
-import logging
-import requests
+import json
+import os
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import asyncio
+import uvicorn
+from fastapi import FastAPI
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- AYARLAR ---
-TOKEN = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8" 
-TIMEOUT = 30 # Yanıt süresini biraz kısalttık
+TOKEN = "8124126646:AAFZngD3nT76FLPQzP1cXDaGyi1CLEnjUkA"
+DB_FILE = "veritabani.json"
+app = FastAPI()
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# Veritabanı dosyasını hazırla
+if not os.path.exists(DB_FILE):
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump({}, f)
 
-# Render Sağlık Kontrolü
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot Aktif")
+def veriyi_toplu_kaydet(yeni_veriler):
+    with open(DB_FILE, "r+", encoding="utf-8") as f:
+        data = json.load(f)
+        data.update(yeni_veriler) # Mevcut verilerin üzerine ekler
+        f.seek(0)
+        json.dump(data, f, indent=4, ensure_ascii=False)
+        f.truncate()
 
-def run_health_check():
-    server = HTTPServer(('0.0.0.0', 10000), HealthCheckHandler)
-    server.serve_forever()
+# --- GERÇEK API (DIŞ ERİŞİM) ---
+@app.get("/api/sorgu")
+def api_sorgu(tc: str = None):
+    with open(DB_FILE, "r", encoding="utf-8") as f:
+        db = json.load(f)
+    if tc in db:
+        return {"durum": "basarili", "kayit": db[tc]}
+    return {"durum": "hata", "mesaj": "Veri bulunamadi"}
 
-# Görsel Kutu Tasarımı
-def format_box(veri):
-    if not veri: return "❌ Veri bulunamadı."
-    if isinstance(veri, dict) and "hata" in veri: return f"⚠️ {veri['hata']}"
-    
-    item = veri[0] if isinstance(veri, list) and len(veri) > 0 else veri
-    
-    msg = "```\n"
-    msg += "➡ + Sorgu Başarılı\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━\n"
-    
-    mapping = {
-        "tc": "T.C", "ad": "ADI", "soyad": "SOYADI", "gsm": "GSM",
-        "dogum_tarihi": "D. TARİHİ", "anne_adi": "ANNE ADI", "baba_adi": "BABA ADI"
-    }
+# --- TELEGRAM BOT (DOSYA YÜKLEME) ---
 
-    for key, label in mapping.items():
-        if key in item and item[key]:
-            msg += f"➡ {label}: {item[key]}\n"
-    
-    msg += "━━━━━━━━━━━━━━━━━━━━\n"
-    msg += "```\n"
-    msg += "📉 Kalan Limitiniz: Sınırsız\n"
-    msg += "🛒 Market: /market | Ref: /referansim"
-    return msg
-
-# Gelişmiş API İstek Motoru
-async def api_get(url, params):
-    try:
-        # User-agent ekleyerek API'nin bizi bot sanıp engellemesini önlüyoruz
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, params=params, headers=headers, timeout=TIMEOUT)
-        if response.status_code == 200:
-            return response.json()
-        return {"hata": f"API Sunucusu hata verdi (Kod: {response.status_code})"}
-    except requests.exceptions.Timeout:
-        return {"hata": "API sunucusu çok geç cevap veriyor (Zaman aşımı)."}
-    except Exception as e:
-        return {"hata": "API sunucusuna bağlanılamıyor. Lütfen IP/Port kontrol edin."}
-
-# --- KOMUTLAR ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome = (
-        "✅ *Sorgu Botu Aktif!*\n\n"
-        "🔍 *Komut Listesi:*\n"
-        "➡ `/adsoyad AD SOYAD` \n"
-        "➡ `/tckn TC` \n"
-        "➡ `/gsm NUMARA` \n"
-        "➡ `/aile TC` \n\n"
-        "📢 *Bilgi:* Sorguları `/komut veri` şeklinde gönderin."
+    await update.message.reply_text(
+        "📁 **Toplu Veri Yükleme Botu**\n\n"
+        "İçinde veri olan bir `.txt` dosyası gönderin.\n"
+        "Format her satırda şu şekilde olmalı:\n"
+        "`TC,GSM,AD,SOYAD,ADRES`"
     )
-    await update.message.reply_text(welcome, parse_mode="Markdown")
 
-async def gsm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        return await update.message.reply_text("❌ Kullanım: `/gsm 542...`")
-    await update.message.reply_text("🔎 Sorgulanıyor, lütfen bekleyin...")
-    res = await api_get("http://45.81.113.22:4014/api/v1/gsm", {"q": context.args[0]})
-    await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
+async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    doc = update.message.document
+    if not doc.file_name.endswith('.txt'):
+        return await update.message.reply_text("❌ Lütfen sadece `.txt` uzantılı dosya gönderin.")
 
-async def adsoyad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) < 2:
-        return await update.message.reply_text("❌ Kullanım: `/adsoyad AD SOYAD`")
-    res = await api_get("http://45.81.113.22:4014/api/v1/adsoyad", {"ad": context.args[0], "soyad": context.args[1]})
-    await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
+    await update.message.reply_text("⏳ Dosya okunuyor ve API'ye aktarılıyor...")
+    
+    # Dosyayı indir
+    yeni_dosya = await context.bot.get_file(doc.file_id)
+    dosya_icerik = await yeni_dosya.download_as_bytearray()
+    metin = dosya_icerik.decode('utf-8')
+
+    yeni_kayitlar = {}
+    hatali_satirlar = 0
+
+    for satir in metin.split('\n'):
+        parcalar = satir.strip().split(',') # Virgül ile ayrılmış veri bekler
+        if len(parcalar) >= 4:
+            tc = parcalar[0]
+            yeni_kayitlar[tc] = {
+                "gsm": parcalar[1],
+                "ad": parcalar[2],
+                "soyad": parcalar[3],
+                "adres": parcalar[4] if len(parcalar) > 4 else "Bilinmiyor"
+            }
+        else:
+            if satir.strip(): hatali_satirlar += 1
+
+    veriyi_toplu_kaydet(yeni_kayitlar)
+    
+    ana_link = f"https://{context.bot.username}.onrender.com/api/sorgu?tc="
+    await update.message.reply_text(
+        f"✅ İşlem Tamamlandı!\n"
+        f"📊 Yüklenen Kayıt: {len(yeni_kayitlar)}\n"
+        f"⚠️ Hatalı Satır: {hatali_satirlar}\n\n"
+        f"🔗 API Örnek Link:\n`{ana_link}{list(yeni_kayitlar.keys())[0]}`",
+        parse_mode="Markdown"
+    )
 
 # --- BAŞLATICI ---
+def run_api():
+    uvicorn.run(app, host="0.0.0.0", port=10000)
+
+async def main():
+    threading.Thread(target=run_api, daemon=True).start()
+    bot = Application.builder().token(TOKEN).build()
+    bot.add_handler(CommandHandler("start", start))
+    # Dosya (Belge) gönderildiğinde çalışacak handler
+    bot.add_handler(MessageHandler(filters.Document.ALL, dosya_isle))
+    await bot.run_polling()
+
 if __name__ == "__main__":
-    threading.Thread(target=run_health_check, daemon=True).start()
-    app = Application.builder().token(TOKEN).build()
-    
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("gsm", gsm))
-    app.add_handler(CommandHandler("adsoyad", adsoyad))
-    
-    app.run_polling()
+    asyncio.run(main())
