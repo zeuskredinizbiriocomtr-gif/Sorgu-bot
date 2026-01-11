@@ -6,14 +6,12 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # --- AYARLAR ---
-# Buraya @BotFather'dan aldığın GÜNCEL tokeni yapıştır
 TOKEN = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8" 
-TIMEOUT = 5
+TIMEOUT = 30 # Yanıt süresini biraz kısalttık
 
-# Loglama
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# --- RENDER CANLI TUTMA SİSTEMİ ---
+# Render Sağlık Kontrolü
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -24,13 +22,11 @@ def run_health_check():
     server = HTTPServer(('0.0.0.0', 10000), HealthCheckHandler)
     server.serve_forever()
 
-# --- GÖRSEL TASARIM VE API MOTORU ---
-def format_box(veri, baslik="Sorgu Sonucu"):
-    if not veri:
-        return "❌ Aranan kritere uygun veri bulunamadı."
-    if isinstance(veri, dict) and "hata" in veri:
-        return f"⚠️ `{veri['hata']}`"
-
+# Görsel Kutu Tasarımı
+def format_box(veri):
+    if not veri: return "❌ Veri bulunamadı."
+    if isinstance(veri, dict) and "hata" in veri: return f"⚠️ {veri['hata']}"
+    
     item = veri[0] if isinstance(veri, list) and len(veri) > 0 else veri
     
     msg = "```\n"
@@ -38,51 +34,53 @@ def format_box(veri, baslik="Sorgu Sonucu"):
     msg += "━━━━━━━━━━━━━━━━━━━━\n"
     
     mapping = {
-        "tc": "T.C", "ad": "ADI", "soyad": "SOYADI",
-        "dogum_tarihi": "DOĞUM TARİHİ", "nufus_il": "NÜFUS İL",
-        "nufus_ilce": "NÜFUS İLÇE", "anne_adi": "ANNE ADI",
-        "anne_tc": "ANNE TC", "baba_adi": "BABA ADI",
-        "baba_tc": "BABA TC", "uyruk": "UYRUK", "yas": "YAŞ",
-        "adres": "ADRES", "gsm": "GSM"
+        "tc": "T.C", "ad": "ADI", "soyad": "SOYADI", "gsm": "GSM",
+        "dogum_tarihi": "D. TARİHİ", "anne_adi": "ANNE ADI", "baba_adi": "BABA ADI"
     }
 
-    found = False
     for key, label in mapping.items():
         if key in item and item[key]:
             msg += f"➡ {label}: {item[key]}\n"
-            found = True
-    
-    if not found: return "❌ Eşleşen veri bulunamadı."
     
     msg += "━━━━━━━━━━━━━━━━━━━━\n"
     msg += "```\n"
-    msg += "📉 Kalan Limitiniz: 1\n\n"
-    msg += "🛒 Market Menüsü: /market\n"
-    msg += "🔗 Referans Linkiniz: /referansim"
+    msg += "📉 Kalan Limitiniz: Sınırsız\n"
+    msg += "🛒 Market: /market | Ref: /referansim"
     return msg
 
+# Gelişmiş API İstek Motoru
 async def api_get(url, params):
     try:
+        # User-agent ekleyerek API'nin bizi bot sanıp engellemesini önlüyoruz
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, params=params, headers=headers, timeout=TIMEOUT)
         if response.status_code == 200:
             return response.json()
-        return {"hata": f"API Hatası (Kod: {response.status_code})"}
+        return {"hata": f"API Sunucusu hata verdi (Kod: {response.status_code})"}
+    except requests.exceptions.Timeout:
+        return {"hata": "API sunucusu çok geç cevap veriyor (Zaman aşımı)."}
     except Exception as e:
-        return {"hata": f"Bağlantı Hatası: Sunucuya ulaşılamıyor."}
+        return {"hata": "API sunucusuna bağlanılamıyor. Lütfen IP/Port kontrol edin."}
 
 # --- KOMUTLAR ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_text = (
-        "👋 *Sorgu Paneli Botuna Hoşgeldiniz!*\n\n"
-        "🔍 *Kullanabileceğiniz Komutlar:*\n"
-        "➡ `/adsoyad AD SOYAD` - İsimden sorgu yapar\n"
-        "➡ `/tckn TCNO` - TC No'dan bilgi getirir\n"
-        "➡ `/aile TCNO` - Aile bilgilerini getirir\n"
-        "➡ `/gsm NO` - GSM sorgusu yapar\n\n"
-        "ℹ️ Örnek: `/adsoyad MEHMET ATAR`"
+    welcome = (
+        "✅ *Sorgu Botu Aktif!*\n\n"
+        "🔍 *Komut Listesi:*\n"
+        "➡ `/adsoyad AD SOYAD` \n"
+        "➡ `/tckn TC` \n"
+        "➡ `/gsm NUMARA` \n"
+        "➡ `/aile TC` \n\n"
+        "📢 *Bilgi:* Sorguları `/komut veri` şeklinde gönderin."
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    await update.message.reply_text(welcome, parse_mode="Markdown")
+
+async def gsm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        return await update.message.reply_text("❌ Kullanım: `/gsm 542...`")
+    await update.message.reply_text("🔎 Sorgulanıyor, lütfen bekleyin...")
+    res = await api_get("http://45.81.113.22:4014/api/v1/gsm", {"q": context.args[0]})
+    await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
 
 async def adsoyad(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 2:
@@ -90,36 +88,13 @@ async def adsoyad(update: Update, context: ContextTypes.DEFAULT_TYPE):
     res = await api_get("http://45.81.113.22:4014/api/v1/adsoyad", {"ad": context.args[0], "soyad": context.args[1]})
     await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
 
-async def tckn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        return await update.message.reply_text("❌ Kullanım: `/tckn TCNO`")
-    res = await api_get("http://45.81.113.22:4014/api/v1/tc/adres", {"tc": context.args[0]})
-    await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
-
-async def aile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        return await update.message.reply_text("❌ Kullanım: `/aile TCNO`")
-    res = await api_get("http://45.81.113.22:4014/api/v1/aile", {"tc": context.args[0]})
-    await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
-
-async def gsm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        return await update.message.reply_text("❌ Kullanım: `/gsm 0555...`")
-    res = await api_get("http://45.81.113.22:4014/api/v1/gsm", {"q": context.args[0]})
-    await update.message.reply_text(format_box(res), parse_mode="MarkdownV2")
-
-# --- ANA ÇALIŞTIRICI ---
+# --- BAŞLATICI ---
 if __name__ == "__main__":
-    # Render uyumasın diye health check başlat
     threading.Thread(target=run_health_check, daemon=True).start()
-    
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("adsoyad", adsoyad))
-    app.add_handler(CommandHandler("tckn", tckn))
-    app.add_handler(CommandHandler("aile", aile))
     app.add_handler(CommandHandler("gsm", gsm))
+    app.add_handler(CommandHandler("adsoyad", adsoyad))
     
-    print("🤖 Bot tüm komutlar yüklendi ve başlatıldı...")
     app.run_polling()
