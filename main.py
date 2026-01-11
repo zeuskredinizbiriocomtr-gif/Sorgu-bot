@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 
 # --- AYARLAR ---
 TOKEN = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8"
-TIMEOUT = 60
+TIMEOUT = 5
 
 # Loglama
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
