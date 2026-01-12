@@ -12,9 +12,10 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # --- AYARLAR ---
 TOKEN = "8089422686:AAFxaI4pBWZCoRtPbEKmWTPaEJ7lEvfQEZA"
 DB_FILE = "veritabani.json"
-BASE_URL = "https://sorgu-bot.onrender.com"
+BASE_URL = "https://sorgu-bot.onrender.com" # Render adresin
 app = FastAPI()
 
+# Veritabanı başlangıç kontrolü
 if not os.path.exists(DB_FILE):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
@@ -31,92 +32,62 @@ def veriyi_kaydet(yeni_veriler):
         return False
 
 # --- API ---
+@app.get("/")
+def home():
+    return {"durum": "aktif", "mesaj": "API Calisiyor. Lütfen /api/sorgu?tc=XXXXXXXXXXX seklinde sorgu yapın."}
+
 @app.get("/api/sorgu")
 def api_sorgu(tc: str = None):
     try:
         with open(DB_FILE, "r", encoding="utf-8") as f:
             db = json.load(f)
-        return db.get(tc, {"durum": "hata", "mesaj": "Kayit bulunamadi"})
+        if tc and tc in db:
+            return {"durum": "basarili", "kayit": db[tc]}
+        return {"durum": "hata", "mesaj": "Kayit bulunamadi"}
     except:
         return {"durum": "hata"}
 
-# --- GELİŞMİŞ AYIKLAMA MANTIĞI ---
-def akilli_temizleyici(metin):
-    """Süslü blokları ve karmaşık metinleri temizleyip JSON yapar."""
-    temiz_sonuc = {}
-    
-    # Blokları ayır (Her T.C: veya TCKN: ile başlayan bölümü yeni bir kayıt sayar)
-    kayitlar = re.split(r'(?:T\.C|TCKN|TC)[:\s]*', metin)
-    
-    for blok in kayitlar:
+# --- AKILLI AYIKLAYICI ---
+def akilli_temizle(metin):
+    sonuclar = {}
+    # Hem süslü blokları hem de düz JSON yapılarını yakalar
+    bloklar = re.split(r'(?:T\.C|TCKN|TC)[:\s]*', metin)
+    for blok in bloklar:
         if not blok.strip(): continue
-        
-        # Regex ile anahtar kelimeleri ve yanındaki değerleri yakala
-        tc_match = re.search(r'(\d{11})', blok)
-        ad_match = re.search(r'(?:ADI|Adi|Ad)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
-        soyad_match = re.search(r'(?:SOYADI|Soyadi|Soyad)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
-        dogum_match = re.search(r'(?:DOĞUM TARİHİ|DogumTarihi|Dogum)[:\s]*([\d\.]+)', blok)
-        anne_match = re.search(r'(?:ANNE ADI|AnneAdi)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
-        baba_match = re.search(r'(?:BABA ADI|BabaAdi)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
-        il_match = re.search(r'(?:NUFUS IL|NufusIl)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
-        ilce_match = re.search(r'(?:NUFUS ILCE|NufusIlce)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
-
-        if tc_match:
-            tckn = tc_match.group(1)
-            # Veriyi temizle ve objeye dönüştür
-            temiz_sonuc[tckn] = {
+        tc = re.search(r'(\d{11})', blok)
+        ad = re.search(r'(?:ADI|Adi)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
+        soyad = re.search(r'(?:SOYADI|Soyadi)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', blok)
+        if tc:
+            tckn = tc.group(1)
+            sonuclar[tckn] = {
                 "TCKN": tckn,
-                "Adi": ad_match.group(1).strip() if ad_match else "-",
-                "Soyadi": soyad_match.group(1).strip() if soyad_match else "-",
-                "DogumTarihi": dogum_match.group(1).strip() if dogum_match else "-",
-                "AnneAdi": anne_match.group(1).strip() if anne_match else "-",
-                "BabaAdi": baba_match.group(1).strip() if baba_match else "-",
-                "NufusIl": il_match.group(1).strip() if il_match else "-",
-                "NufusIlce": ilce_match.group(1).strip() if ilce_match else "-"
+                "Adi": ad.group(1).strip() if ad else "-",
+                "Soyadi": soyad.group(1).strip() if soyad else "-"
             }
-    
-    return temiz_sonuc
+    return sonuclar
 
-# --- BOT İŞLEMLERİ ---
+# --- BOT ---
 async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     doc = update.message.document
     if not doc or not doc.file_name.endswith('.txt'): return
-    
-    status = await update.message.reply_text("🔍 Süslü veriler ayıklanıyor ve JSON'a dönüştürülüyor...")
-    
+    status = await update.message.reply_text("🔬 Veriler ayıklanıyor...")
     try:
         file = await context.bot.get_file(doc.file_id)
         content = await file.download_as_bytearray()
         metin = content.decode('utf-8', errors='ignore')
-
-        # Önce metin halindeki süslü veriyi JSON'a çeviriyoruz
-        temizlenmis_json = akilli_temizleyici(metin)
-
-        if temizlenmis_json:
-            # Temizlenmiş JSON verisini veritabanına kaydediyoruz
-            veriyi_kaydet(temizlenmis_json)
-            sample_tc = list(temizlenmis_json.keys())[0]
-            
-            await status.edit_text(
-                f"✅ **Dönüştürme ve Yükleme Tamam!**\n\n"
-                f"📦 **İşlem:** Süslü metin blokları temizlendi.\n"
-                f"📊 **Kayıt Sayısı:** {len(temizlenmis_json)}\n\n"
-                f"🔗 **API Sorgu Linki:**\n`{BASE_URL}/api/sorgu?tc={sample_tc}`",
-                parse_mode="Markdown"
-            )
-        else:
-            await status.edit_text("❌ Dosyada geçerli bir obje veya T.C. numarası bulunamadı.")
-            
+        temiz_veri = akilli_temle(metin) if "ADI" in metin else json.loads(metin)
+        if isinstance(temiz_veri, dict):
+            # Eğer veri zaten düz JSON ise key'leri TCKN yapalım
+            if "TCKN" in temiz_veri: temiz_veri = {temiz_veri["TCKN"]: temiz_veri}
+            veriyi_kaydet(temiz_veri)
+            sample_tc = list(temiz_veri.keys())[0]
+            await status.edit_text(f"✅ Başarılı!\n🔗 API: `{BASE_URL}/api/sorgu?tc={sample_tc}`")
     except Exception as e:
-        await status.edit_text(f"❌ Hata oluştu: {str(e)}")
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💎 **Veri Ayıklayıcı & API Yükleyici**\n\nSüslü kutu mesajlarını veya karmaşık listeleri içeren .txt dosyasını atın, ben tertemiz JSON yapıp API'ye yükleyeyim.")
+        await status.edit_text(f"❌ Hata: {str(e)}")
 
 async def main():
     threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=10000), daemon=True).start()
     application = Application.builder().token(TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.Document.ALL, dosya_isle))
     await application.initialize()
     await application.start()
