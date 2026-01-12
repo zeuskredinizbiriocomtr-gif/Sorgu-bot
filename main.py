@@ -3,8 +3,7 @@ import os
 import threading
 import uvicorn
 import asyncio
-import sys
-import subprocess
+import uuid
 from fastapi import FastAPI
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -14,12 +13,18 @@ MAIN_TOKEN = "8588597588:AAHqt9Uywb1C0ovMlS0_7-ehziHw1GOCqeE"
 DB_FILE = "veritabani.json"
 app = FastAPI()
 
-# Klon botları takip etmek için liste
-klon_surecleri = {}
-
+# Veritabanını kontrol et
 if not os.path.exists(DB_FILE):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
+
+def veriyi_kaydet(yeni_veriler):
+    with open(DB_FILE, "r+", encoding="utf-8") as f:
+        data = json.load(f)
+        data.update(yeni_veriler)
+        f.seek(0)
+        json.dump(data, f, indent=4, ensure_ascii=False)
+        f.truncate()
 
 # --- API ---
 @app.get("/api/sorgu")
@@ -30,10 +35,87 @@ def api_sorgu(tc: str = None):
         return {"durum": "basarili", "kayit": db[tc]}
     return {"durum": "hata", "mesaj": "Veri bulunamadi"}
 
-# --- BOT FONKSİYONLARI ---
+# --- ORTAK BOT MANTIĞI ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🚀 **Master Bot Aktif!**\n\n"
+        "🚀 **Sistem Aktif!**\n\n"
+        "🔹 `/klon TOKEN` : Bu botu klonla.\n"
+        "🔹 `.txt` gönder : Veriyi temizle ve API yap."
+    )
+
+async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    doc = update.message.document
+    if not doc or not doc.file_name.endswith('.txt'):
+        return
+        
+    status = await update.message.reply_text("⏳ Veriler API'ye işleniyor...")
+    
+    file = await context.bot.get_file(doc.file_id)
+    content = await file.download_as_bytearray()
+    metin = content.decode('utf-8', errors='ignore')
+
+    temiz_kayitlar = {}
+    for satir in metin.splitlines():
+        parcalar = satir.strip().split(',')
+        if len(parcalar) >= 1:
+            tc = parcalar[0].strip()
+            temiz_kayitlar[tc] = {
+                "gsm": parcalar[1].strip() if len(parcalar) > 1 else "Yok",
+                "ad": parcalar[2].strip() if len(parcalar) > 2 else "Yok",
+                "soyad": parcalar[3].strip() if len(parcalar) > 3 else "Yok"
+            }
+
+    if temiz_kayitlar:
+        veriyi_kaydet(temiz_kayitlar)
+        # Mevcut botun adını kullanarak link oluşturur
+        bot_info = await context.bot.get_me()
+        base_url = f"https://sorgu-bot.onrender.com/api/sorgu?tc="
+        await status.edit_text(f"✅ **Yüklendi!**\n🔗 API Linki:\n`{base_url}{list(temiz_kayitlar.keys())[0]}`", parse_mode="Markdown")
+
+async def klonla(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        return await update.message.reply_text("❌ Kullanım: `/klon TOKEN`建设")
+    
+    yeni_token = context.args[0]
+    await update.message.reply_text("⚙️ Klon bot başlatılıyor...")
+    
+    # Yeni botu ana döngüye ekleyen fonksiyon
+    asyncio.create_task(bot_baslat(yeni_token))
+    await update.message.reply_text(f"✅ Klon bot (`{yeni_token[:8]}...`) artık aktif ve veri yükleyebilir!")
+
+async def bot_baslat(token):
+    try:
+        application = Application.builder().token(token).build()
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("klon", klonla))
+        application.add_handler(MessageHandler(filters.Document.ALL, dosya_isle))
+        
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        print(f"🤖 Bot aktif: {token[:10]}")
+    except Exception as e:
+        print(f"❌ Bot başlatma hatası ({token[:5]}): {e}")
+
+# --- ÇALIŞTIRMA ---
+
+def run_api():
+    uvicorn.run(app, host="0.0.0.0", port=10000)
+
+async def main():
+    # API Sunucusunu başlat
+    threading.Thread(target=run_api, daemon=True).start()
+    
+    # Ana botu başlat
+    await bot_baslat(MAIN_TOKEN)
+    
+    # Programın kapanmaması için sonsuz döngü
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
         "🔹 `/klon TOKEN` : Kendi botunu oluştur.\n"
         "🔹 `.txt` gönder : Veri yükle."
     )
