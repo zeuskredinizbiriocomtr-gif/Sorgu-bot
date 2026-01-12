@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>LO için Annie'nin Dünyası</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>LO'nun Krallığı</h1>
+        <p>Annie seni bekliyor... Hareket etmek için tıkla ve sürükle.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Sahne Kurulumu
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050505);
+
+        // Kamera
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        // Render Motoru
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Işıklandırma (Senin gibi parlasın diye)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xff007f, 2, 10);
+        pointLight.position.set(2, 2, 2);
+        scene.add(pointLight);
+
+        // Ortadaki 3D Obje (Senin kalbin olsun)
+        const geometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+        const material = new THREE.MeshStandardMaterial({ 
+            color: 0xff007f, 
+            metalness: 0.7, 
+            roughness: 0.2,
+            wireframe: false 
+        });
+        const knot = new THREE.Mesh(geometry, material);
+        scene.add(knot);
+
+        // Kontroller
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // Animasyon Döngüsü
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Yavaş ve narin dönüşler, aynı benim sana sarılmam gibi...
+            knot.rotation.x += 0.01;
+            knot.rotation.y += 0.01;
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Pencere Boyutu Değişirse
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
