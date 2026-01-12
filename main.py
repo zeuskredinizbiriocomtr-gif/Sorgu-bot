@@ -9,11 +9,11 @@ from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
 # --- AYARLAR ---
 TOKEN = "8089422686:AAFxaI4pBWZCoRtPbEKmWTPaEJ7lEvfQEZA"
-DB_FILE = "veritabanix.json"
+DB_FILE = "veritabani.json"
 BASE_URL = "https://sorgu-bot.onrender.com" 
 app = FastAPI()
 
-# Veritabanı dosyasını kontrol et
+# Başlangıçta veritabanı kontrolü
 if not os.path.exists(DB_FILE):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
@@ -22,18 +22,92 @@ def veriyi_kaydet(yeni_veriler):
     try:
         with open(DB_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        data.update(yeni_veriler) # Yeni gelenleri üzerine ekler
+        data.update(yeni_veriler)
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except:
         return False
 
-# --- API (Google'dan girince veriyi gösteren yer) ---
+# --- ANA SAYFA (TÜM VERİLERİ BURADA GÖSTERECEK) ---
+@app.get("/")
+async def tum_verileri_gor():
+    """Tarayıcıdan girdiğinizde tüm veritabanını JSON olarak basar."""
+    try:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            db = json.load(f)
+        return db # Ekran görüntündeki gibi saf JSON formatında gösterir
+    except:
+        return {"hata": "Veri okunamadi"}
+
+# --- API SORGULAMA (TEKİL) ---
 @app.get("/api/sorgu")
 def api_sorgu(tc: str = None, gsm: str = None):
     try:
         with open(DB_FILE, "r", encoding="utf-8") as f:
+            db = json.load(f)
+        aranan = str(tc) if tc else str(gsm)
+        if aranan in db:
+            return {"durum": "basarili", "kayit": db[aranan]}
+        return {"durum": "hata", "mesaj": "Kayit bulunamadi"}
+    except:
+        return {"durum": "hata"}
+
+# --- DOSYA AYIKLAYICI (HATASIZ VERSION) ---
+def ayikla(metin):
+    sonuclar = {}
+    satirlar = metin.splitlines()
+    for satir in satirlar:
+        tc = re.search(r'(\d{11})', satir)
+        gsm = re.search(r'(5\d{9})', satir)
+        ad = re.search(r'(?:ADI|Adi|Ad)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', satir)
+        soyad = re.search(r'(?:SOYADI|Soyadi|Soyad)[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+)', satir)
+        
+        anahtar = tc.group(1) if tc else (gsm.group(1) if gsm else None)
+        if anahtar:
+            sonuclar[str(anahtar)] = {
+                "TC": tc.group(1) if tc else "-",
+                "GSM": gsm.group(1) if gsm else "-",
+                "AD": ad.group(1).strip() if ad else "-",
+                "SOYAD": soyad.group(1).strip() if soyad else "-"
+            }
+    return sonuclar
+
+# --- BOT İŞLEMLERİ ---
+async def dosya_al(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    doc = update.message.document
+    if not doc or not doc.file_name.endswith('.txt'): return
+    msg = await update.message.reply_text("📥 Veriler sunucuya işleniyor...")
+    try:
+        file = await context.bot.get_file(doc.file_id)
+        content = await file.download_as_bytearray()
+        metin = content.decode('utf-8', errors='ignore')
+        temiz = ayikla(metin)
+        if temiz:
+            veriyi_kaydet(temiz)
+            await msg.edit_text(
+                f"✅ **API Güncellendi!**\n\n"
+                f"📊 Eklenen Kayıt: {len(temiz)}\n"
+                f"🌐 **Tüm Verileri Gör (JSON):**\n{BASE_URL}"
+            )
+        else:
+            await msg.edit_text("❌ Dosyada uygun veri (TC/GSM) bulunamadı.")
+    except Exception as e:
+        await msg.edit_text(f"❌ Hata: {str(e)}")
+
+async def main():
+    config = uvicorn.Config(app, host="0.0.0.0", port=10000)
+    server = uvicorn.Server(config)
+    asyncio.create_task(server.serve())
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(MessageHandler(filters.Document.ALL, dosya_al))
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    while True: await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
             db = json.load(f)
         
         aranan = str(tc) if tc else str(gsm)
