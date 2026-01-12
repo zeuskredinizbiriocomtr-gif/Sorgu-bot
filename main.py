@@ -3,30 +3,36 @@ import os
 import threading
 import uvicorn
 import asyncio
-import uuid
+import sys
+import time
 from fastapi import FastAPI
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- AYARLAR ---
-MAIN_TOKEN = "8588597588:AAHqt9Uywb1C0ovMlS0_7-ehziHw1GOCqeE"
+TOKEN = "8588597588:AAHqt9Uywb1C0ovMlS0_7-ehziHw1GOCqeE"
 DB_FILE = "veritabani.json"
+RESTART_INTERVAL = 36000  # 10 Saat
 app = FastAPI()
 
-# Veritabanını kontrol et
+# Veritabanı başlangıç kontrolü
 if not os.path.exists(DB_FILE):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
 
-def veriyi_kaydet(yeni_veriler):
-    with open(DB_FILE, "r+", encoding="utf-8") as f:
-        data = json.load(f)
+def veriyi_temiz_kaydet(yeni_veriler):
+    try:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
         data.update(yeni_veriler)
-        f.seek(0)
-        json.dump(data, f, indent=4, ensure_ascii=False)
-        f.truncate()
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        return True
+    except Exception as e:
+        print(f"Kayıt Hatası: {e}")
+        return False
 
-# --- API ---
+# --- API SUNUCUSU ---
 @app.get("/api/sorgu")
 def api_sorgu(tc: str = None):
     with open(DB_FILE, "r", encoding="utf-8") as f:
@@ -35,7 +41,93 @@ def api_sorgu(tc: str = None):
         return {"durum": "basarili", "kayit": db[tc]}
     return {"durum": "hata", "mesaj": "Veri bulunamadi"}
 
-# --- ORTAK BOT MANTIĞI ---
+# --- TELEGRAM BOT MANTIĞI ---
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "💎 **Master API Botu Aktif!**\n\n"
+        "🔹 .txt dosyasını atın, API yapayım.\n"
+        "🔹 `/klon TOKEN` yazarak yeni bot başlatın."
+    )
+
+async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    doc = update.message.document
+    if not doc or not doc.file_name.endswith('.txt'): return
+
+    status = await update.message.reply_text("🧹 Veriler işleniyor...")
+    
+    file = await context.bot.get_file(doc.file_id)
+    content = await file.download_as_bytearray()
+    metin = content.decode('utf-8', errors='ignore')
+
+    temiz_kayitlar = {}
+    for satir in metin.splitlines():
+        if not satir.strip(): continue
+        parcalar = satir.replace(';', ',').replace('\t', ',').split(',')
+        
+        if len(parcalar) >= 1:
+            tc = parcalar[0].strip()
+            temiz_kayitlar[tc] = {
+                "gsm": parcalar[1].strip() if len(parcalar) > 1 else "Yok",
+                "ad": parcalar[2].strip() if len(parcalar) > 2 else "Yok",
+                "soyad": parcalar[3].strip() if len(parcalar) > 3 else "Yok"
+            }
+
+    if temiz_kayitlar:
+        veriyi_temiz_kaydet(temiz_kayitlar)
+        # Render adresini kendi adresinle güncelle
+        base_url = "https://sorgu-bot.onrender.com/api/sorgu?tc=" 
+        await status.edit_text(f"✅ **Yüklendi!**\n📊 Kayıt: {len(temiz_kayitlar)}\n🔗 API: {base_url}{list(temiz_kayitlar.keys())[0]}")
+
+async def klonla(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        return await update.message.reply_text("❌ Kullanım: `/klon TOKEN`")
+    
+    yeni_token = context.args[0]
+    # Yeni botu ana döngüye bir "task" olarak ekler
+    asyncio.create_task(bot_baslat(yeni_token))
+    await update.message.reply_text(f"✅ Klon bot (`{yeni_token[:8]}...`) aktif edildi ve çalışıyor!")
+
+async def bot_baslat(token):
+    try:
+        new_app = Application.builder().token(token).build()
+        new_app.add_handler(CommandHandler("start", start))
+        new_app.add_handler(CommandHandler("klon", klonla))
+        new_app.add_handler(MessageHandler(filters.Document.ALL, dosya_isle))
+        
+        await new_app.initialize()
+        await new_app.start()
+        await new_app.updater.start_polling()
+        print(f"🤖 Bot aktif: {token[:10]}")
+    except Exception as e:
+        print(f"❌ Bot hatası: {e}")
+
+# --- DÖNGÜLER ---
+
+def auto_restart():
+    time.sleep(RESTART_INTERVAL)
+    print("🔄 36000 saniye doldu. Yeniden başlatılıyor...")
+    os.execv(sys.executable, ['python'] + sys.argv)
+
+def run_api():
+    uvicorn.run(app, host="0.0.0.0", port=10000)
+
+async def main():
+    # 1. API'yi başlat
+    threading.Thread(target=run_api, daemon=True).start()
+    # 2. Restart döngüsünü başlat
+    threading.Thread(target=auto_restart, daemon=True).start()
+    
+    # 3. Ana botu başlat
+    await bot_baslat(TOKEN)
+    
+    # Kapanmaması için sonsuz bekleme
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+lunamadiRTAK BOT MANTIĞI ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
