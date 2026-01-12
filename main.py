@@ -10,17 +10,18 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- AYARLAR ---
-TOKEN = "8588597588:AAHqt9Uywb1COovMlS0_7-ehziHw1GOCqeE"
+TOKEN = "8089422686:AAFxaI4pBWZCoRtPbEKmWTPaEJ7lEvfQEZA"
 DB_FILE = "veritabani.json"
 RESTART_INTERVAL = 36000 # 10 Saat
 BASE_URL = "https://sorgu-bot.onrender.com" # Burayı Render adresinle aynı yap
 app = FastAPI()
 
+# Veritabanı başlangıç kontrolü
 if not os.path.exists(DB_FILE):
     with open(DB_FILE, "w", encoding="utf-8") as f:
         json.dump({}, f)
 
-def veriyi_temiz_kaydet(yeni_veriler):
+def veriyi_kaydet(yeni_veriler):
     try:
         with open(DB_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -29,10 +30,10 @@ def veriyi_temiz_kaydet(yeni_veriler):
             json.dump(data, f, indent=4, ensure_ascii=False)
         return True
     except Exception as e:
-        print(f"Kayit Hatasi: {e}")
+        print(f"Veri Kayıt Hatası: {e}")
         return False
 
-# --- API ---
+# --- API SUNUCUSU ---
 @app.get("/api/sorgu")
 def api_sorgu(tc: str = None):
     try:
@@ -40,17 +41,16 @@ def api_sorgu(tc: str = None):
             db = json.load(f)
         if tc in db:
             return {"durum": "basarili", "kayit": db[tc]}
-        return {"durum": "hata", "mesaj": "Veri bulunamadi"}
+        return {"durum": "hata", "mesaj": "Kayit bulunamadi"}
     except:
         return {"durum": "hata"}
 
-# --- BOT FONKSİYONLARI ---
-
+# --- TELEGRAM BOT MANTIĞI ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💎 **Sistem Aktif!**\n\n"
-        "🔹 `.txt` dosyası gönder -> Temizleyip API yapayım.\n"
-        "🔹 `/klon TOKEN` -> Bu botu başka hesaba klonla."
+        "Lütfen sisteme eklemek istediğiniz `.txt` dosyasını gönderin. "
+        "Veriler otomatik temizlenip API formatına getirilecektir."
     )
 
 async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,7 +58,7 @@ async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not doc or not doc.file_name.endswith('.txt'):
         return
     
-    status = await update.message.reply_text("📥 Veriler API havuzuna işleniyor...")
+    status = await update.message.reply_text("📥 Dosya okunuyor ve API havuzuna işleniyor...")
     
     try:
         file = await context.bot.get_file(doc.file_id)
@@ -68,10 +68,13 @@ async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         temiz_kayitlar = {}
         for satir in metin.splitlines():
             if not satir.strip(): continue
-            # Ayraçları temizle ve parçala
+            
+            # Ayraçları (virgül, noktalı virgül, tab) standardize et
             p = satir.replace(';', ',').replace('\t', ',').split(',')
+            
             if len(p) >= 1:
                 tc = p[0].strip()
+                # Verileri düzgün formatta sözlüğe ekle
                 temiz_kayitlar[tc] = {
                     "gsm": p[1].strip() if len(p) > 1 else "-",
                     "ad": p[2].strip() if len(p) > 2 else "-",
@@ -79,15 +82,49 @@ async def dosya_isle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 }
 
         if temiz_kayitlar:
-            veriyi_temiz_kaydet(temiz_kayitlar)
+            veriyi_kaydet(temiz_kayitlar)
             sample_tc = list(temiz_kayitlar.keys())[0]
-            # Mesajı güncelliyoruz ve API linkini veriyoruz
+            # İşlem biter bitmez linki ver
             await status.edit_text(
-                f"✅ **Veri Başarıyla Yüklendi!**\n\n"
-                f"📊 **Eklenen Kayıt:** {len(temiz_kayitlar)}\n"
-                f"🔗 **API Sorgu Linki:**\n`{BASE_URL}/api/sorgu?tc={sample_tc}`",
+                f"✅ **Veri Başarıyla İşlendi!**\n\n"
+                f"📊 **Toplam Kayıt:** {len(temiz_kayitlar)}\n"
+                f"🔗 **API Linki (Örnek):**\n`{BASE_URL}/api/sorgu?tc={sample_tc}`",
                 parse_mode="Markdown"
             )
+        else:
+            await status.edit_text("❌ Dosya içinde uygun formatta veri bulunamadı.")
+            
+    except Exception as e:
+        await status.edit_text(f"❌ İşlem sırasında bir hata oluştu: {str(e)}")
+
+# --- SİSTEM DÖNGÜLERİ ---
+def auto_restart():
+    time.sleep(RESTART_INTERVAL)
+    os.execv(sys.executable, ['python'] + sys.argv)
+
+async def main():
+    # API Sunucusunu başlat (Port 10000)
+    threading.Thread(target=lambda: uvicorn.run(app, host="0.0.0.0", port=10000), daemon=True).start()
+    
+    # 10 saatlik restart döngüsünü başlat
+    threading.Thread(target=auto_restart, daemon=True).start()
+    
+    # Botu yapılandır
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Document.ALL, dosya_isle))
+    
+    # Botu başlat
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(drop_pending_updates=True)
+    
+    # Programın kapanmasını engelle
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == "__main__":
+    asyncio.run(main())
         else:
             await status.edit_text("❌ Dosya içinde geçerli veri bulunamadı.")
             
